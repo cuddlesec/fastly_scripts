@@ -39,6 +39,4 @@ ACL="$ACL ]
 
 ACL=$(echo $ACL | sed 's/\}\, \] \}/} ] }/g')
 echo "Adding IPs to Fastly"
-#echo $ACL
-#curl -H "Fastly-Key: $API_KEY" -H "Content-Type: application/json" -H "Accept: application/json" -XPATCH "https://api.fastly.com/service/$SERVICE_ID/acl/$ACL_ID/entries" -d "$ACL"
-curl -H "Fastly-Key: $API_KEY" -H "Content-Type: application/json" -H "Accept: application/json" -XGET "https://api.fastly.com/service/$SERVICE_ID/acl/$ACL_ID/entries"
+curl -H "Fastly-Key: $API_KEY" -H "Content-Type: application/json" -H "Accept: application/json" -XPATCH "https://api.fastly.com/service/$SERVICE_ID/acl/$ACL_ID/entries" -d "$ACL"
