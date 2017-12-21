@@ -15,6 +15,37 @@ fi
 SERVICE_ID=$1
 ACL_ID=$2
 API_KEY=$3
+
+
+echo "Cleaning current TOR IP list"
+ACL_IDS=$(curl -s -H "Fastly-Key: $API_KEY" -H "Content-Type: application/json" -H "Accept: application/json" -XGET "https://api.fastly.com/service/$SERVICE_ID/acl/$ACL_ID/entries" | egrep -o '"id"\:\"(.*?)\"' | cut -d : -f 2 | tr -d '"')
+
+CLEANUP_ACL="{
+  \"entries\": [
+"
+
+IP_COUNT=0
+for id in $ACL_IDS
+do
+  CLEANUP_ACL="$CLEANUP_ACL {
+      \"op\": \"delete\",
+      \"id\": \"$id\"
+    },"
+    IP_COUNT=$(($IP_COUNT+1))
+done
+
+#add trailing json closers
+CLEANUP_ACL="$CLEANUP_ACL ]
+}"
+
+#remove last ,
+CLEANUP_ACL=$(echo $CLEANUP_ACL | sed 's/\}\, \] \}/} ] }/g')
+
+echo "Cleaning $IP_COUNT IPs from ACL ID: $ACL_ID"
+#Making patch call to delete all old ACLs
+echo $CLEANUP_ACL > .cleanup.json
+curl -w "\n" -s -H "Fastly-Key: $API_KEY" -H "Content-Type: application/json" -H "Accept: application/json" -XPATCH "https://api.fastly.com/service/$SERVICE_ID/acl/$ACL_ID/entries" -d @.cleanup.json
+
 echo "Retriving Lastest TOR IP list"
 TOR_IP=$(curl -s https://check.torproject.org/exit-addresses | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
 #add init json struct
@@ -37,6 +68,10 @@ echo "Retrived $IP_COUNT IPs from TOR"
 ACL="$ACL ]
 }"
 
+#remove last ,
 ACL=$(echo $ACL | sed 's/\}\, \] \}/} ] }/g')
+
 echo "Adding IPs to Fastly"
-curl -H "Fastly-Key: $API_KEY" -H "Content-Type: application/json" -H "Accept: application/json" -XPATCH "https://api.fastly.com/service/$SERVICE_ID/acl/$ACL_ID/entries" -d "$ACL"
+#Making patch call to add new IPs
+echo $ACL > .tor_acl.json
+curl -w "\n" -s -H "Fastly-Key: $API_KEY" -H "Content-Type: application/json" -H "Accept: application/json" -XPATCH "https://api.fastly.com/service/$SERVICE_ID/acl/$ACL_ID/entries" -d @.tor_acl.json
